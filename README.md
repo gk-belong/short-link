@@ -10,6 +10,7 @@ A simple, high-performance URL shortener service built with Spring Boot and WebF
 - **Thread-safe & Fast**: Uses Caffeine cache for fast in-memory storage with concurrency support.
 - **Robust Error Handling**: Centralized exception handling for 400 (Bad Request), 404 (Not Found), and 500 (Internal Server Error) scenarios.
 - **Validation**: Ensures that only valid URLs are processed.
+- **API Documentation**: Interactive API documentation using Swagger UI (SpringDoc).
 
 ## Tech Stack
 
@@ -46,6 +47,14 @@ A simple, high-performance URL shortener service built with Spring Boot and WebF
    ```
 
 The service will start on `http://localhost:8080`.
+
+## API Documentation
+
+Once the application is running, you can access the interactive Swagger UI at:
+- [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+
+The OpenAPI spec in JSON format is available at:
+- [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
 
 ## API Endpoints
 
