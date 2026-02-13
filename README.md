@@ -30,6 +30,8 @@ A simple, high-performance URL shortener service built with Spring Boot and WebF
 
 ### Running the Application
 
+#### Option 1: Native (Local Machine)
+
 1. Clone the repository:
    ```bash
    git clone <repository-url>
@@ -47,6 +49,21 @@ A simple, high-performance URL shortener service built with Spring Boot and WebF
    ```
 
 The service will start on `http://localhost`.
+
+#### Option 2: Using Docker (Recommended for Custom Domain)
+
+Using Docker simplifies the setup, especially for using port 80 and custom domains, by isolating the environment.
+
+1.  **Build and run with Docker Compose**:
+    ```bash
+    docker-compose up --build
+    ```
+    This will build the image and start the service on port 80 of your host machine.
+
+2.  **Why Docker?**
+    - **Port Mapping**: Map container port to host port 80 without needing to run Gradle with `sudo`.
+    - **Environment Consistency**: No need to install JDK 17 on your host.
+    - **Simplified Networking**: Link with other services (like Redis) in the future.
 
 ## Configuration
 

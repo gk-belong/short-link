@@ -1,0 +1,10 @@
+services:
+  short-link:
+    build: .
+    ports:
+      - "80:8080"
+    environment:
+      - SHORTLINK_HOST=short.ly
+      - SERVER_PORT=8080
+    extra_hosts:
+      - "short.ly:127.0.0.1"
