@@ -1,0 +1,23 @@
+POST http://localhost/api/v1/urls/shorten
+Content-Type: application/json
+
+{
+  "url": "https://www.originenergy.com.au/electricity-gas/plans.html"
+}
+
+> {%
+    client.global.set("short_code", response.body.code);
+%}
+
+###
+GET http://localhost/api/v1/urls/{{short_code}}/info
+
+###
+GET http://localhost/{{short_code}}
+
+###
+
+#When host short.ly is added to /etc/hosts use below
+GET http://short.ly/{{short_code}}
+
+###

@@ -35,6 +35,7 @@ class UrlShortenerIntegrationTests {
         String code = shortenResponse.code();
         assertNotNull(code);
         assertEquals(originalUrl, shortenResponse.originalUrl());
+        assertNotNull(shortenResponse.shortUrl());
 
         // 2. Get info
         webTestClient.get()

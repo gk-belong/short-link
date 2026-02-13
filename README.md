@@ -46,15 +46,41 @@ A simple, high-performance URL shortener service built with Spring Boot and WebF
    ./gradlew bootRun
    ```
 
-The service will start on `http://localhost:8080`.
+The service will start on `http://localhost`.
+
+## Configuration
+
+### Custom Domain Setup (`short.ly`)
+
+The application is configured to use `short.ly` as the host for generated short links. This is controlled by the `shortlink.host` property in `src/main/resources/application.properties`.
+
+To use this domain locally:
+
+1.  **Update your hosts file**:
+    Add the following entry to your `/etc/hosts` (macOS/Linux) or `C:\Windows\System32\drivers\etc\hosts` (Windows) file:
+    ```text
+    127.0.0.1 short.ly
+    ```
+
+2.  **Application Port**:
+    The application is configured to run on port `80` (see `server.port` in `application.properties`). Note that running on port 80 may require administrative privileges (e.g., `sudo ./gradlew bootRun`). Alternatively, you can change the port back to `8080`.
+
+## Using the HTTP Client
+
+The project includes a `short-link-api.http` file that can be used to test the API endpoints directly from your IDE (like IntelliJ IDEA with the HTTP Client plugin) or using `httpyac`/`rest-client`.
+
+It contains requests for:
+- Shortening a URL.
+- Retrieving short code info.
+- Testing the redirection.
 
 ## API Documentation
 
 Once the application is running, you can access the interactive Swagger UI at:
-- [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+- [http://localhost/swagger-ui.html](http://localhost/swagger-ui.html)
 
 The OpenAPI spec in JSON format is available at:
-- [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
+- [http://localhost/v3/api-docs](http://localhost/v3/api-docs)
 
 ## API Endpoints
 
@@ -70,7 +96,7 @@ The OpenAPI spec in JSON format is available at:
   ```json
   {
     "originalUrl": "https://www.example.com/some/long/path",
-    "shortUrl": "http://localhost:8080/a1B2c3",
+    "shortUrl": "http://short.ly/a1B2c3",
     "code": "a1B2c3"
   }
   ```
@@ -81,7 +107,7 @@ The OpenAPI spec in JSON format is available at:
   ```json
   {
     "originalUrl": "https://www.example.com/some/long/path",
-    "shortUrl": "http://localhost:8080/a1B2c3",
+    "shortUrl": "http://short.ly/a1B2c3",
     "code": "a1B2c3"
   }
   ```

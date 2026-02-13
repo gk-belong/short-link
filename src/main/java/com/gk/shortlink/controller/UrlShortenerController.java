@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,9 +26,11 @@ import java.net.URI;
 public class UrlShortenerController {
 
     private final UrlShortenerService urlShortenerService;
+    private final String shortLinkHost;
 
-    public UrlShortenerController(UrlShortenerService urlShortenerService) {
+    public UrlShortenerController(UrlShortenerService urlShortenerService, @Value("${shortlink.host: localhost}") String shortLinkHost) {
         this.urlShortenerService = urlShortenerService;
+        this.shortLinkHost = shortLinkHost;
     }
 
     @PostMapping("/shorten")
@@ -43,7 +46,7 @@ public class UrlShortenerController {
         return Mono.fromCallable(() -> {
             var code = urlShortenerService.shorten(shortenRequest.url());
             var baseUrl = getBaseUrl(exchange);
-            var shortUrl = (baseUrl != null ? baseUrl + "/" : "") + code;
+            var shortUrl = baseUrl + "/" + code;
 
             return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ShortenResponse(shortenRequest.url(), shortUrl, code));
@@ -68,33 +71,30 @@ public class UrlShortenerController {
                 throw new UrlNotFoundException("Short code not found: " + code);
             }
             var baseUrl = getBaseUrl(exchange);
-            var shortUrl = (baseUrl != null ? baseUrl + "/" : "") + code;
+            var shortUrl = baseUrl + "/" + code;
 
             return ResponseEntity.ok(new ShortenResponse(originalUrl, shortUrl, code));
         });
     }
 
     private String getBaseUrl(ServerWebExchange exchange) {
-        if (exchange == null) {
-            return null;
-        } else {
-            exchange.getRequest().getURI();
-        }
-        URI uri = exchange.getRequest().getURI();
-        String scheme = uri.getScheme();
-        String host = uri.getHost();
-        int port = uri.getPort();
-
-        if (scheme == null || host == null) {
-            return null;
+        String scheme = "http";
+        if (exchange != null) {
+            URI uri = exchange.getRequest().getURI();
+            if (uri.getScheme() != null) {
+                scheme = uri.getScheme();
+            }
         }
 
-        // Handle short.ly specifically if needed, or just return the host
-        StringBuilder baseUrl = new StringBuilder(scheme).append("://").append(host);
+        StringBuilder baseUrl = new StringBuilder(scheme).append("://").append(shortLinkHost);
 
-        // Only append port if it's not the default for the scheme
-        if (port != -1 && ((scheme.equals("http") && port != 80) || (scheme.equals("https") && port != 443))) {
-            baseUrl.append(":").append(port);
+        if (exchange != null) {
+            URI uri = exchange.getRequest().getURI();
+            int port = uri.getPort();
+            // Only append port if it's not the default for the scheme
+            if (port != -1 && ((scheme.equals("http") && port != 80) || (scheme.equals("https") && port != 443))) {
+                baseUrl.append(":").append(port);
+            }
         }
         return baseUrl.toString();
     }

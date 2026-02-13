@@ -11,9 +11,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-@WebFluxTest(UrlShortenerController.class)
+@WebFluxTest(controllers = UrlShortenerController.class, properties = "shortlink.host=short.ly")
 class UrlShortenerControllerTests {
 
     private static final String ORIGINAL_URL = "https://example.com";
@@ -39,7 +38,7 @@ class UrlShortenerControllerTests {
             .expectBody(ShortenResponse.class)
             .value(response -> {
                 assertEquals(ORIGINAL_URL, response.originalUrl());
-                assertNotNull(response.shortUrl());
+                assertEquals("http://short.ly/" + code, response.shortUrl());
                 assertEquals(code, response.code());
             });
     }
@@ -89,7 +88,7 @@ class UrlShortenerControllerTests {
             .expectBody(ShortenResponse.class)
             .value(response -> {
                 assertEquals(ORIGINAL_URL, response.originalUrl());
-                assertNotNull(response.shortUrl());
+                assertEquals("http://short.ly/" + code, response.shortUrl());
                 assertEquals(code, response.code());
             });
     }
