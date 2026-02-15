@@ -1,120 +1,110 @@
 package com.gk.shortlink.service;
 
+import com.gk.shortlink.config.ShortLinkProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Flux;
+import reactor.test.StepVerifier;
 
-import java.util.Collections;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.AbstractMap;
+import java.util.stream.Collectors;
 
-import static com.gk.shortlink.service.UrlShortenerService.CODE_LENGTH;
 import static org.junit.jupiter.api.Assertions.*;
 
 class UrlShortenerServiceTests {
-
+    private static final int DEFAULT_CODE_LENGTH = 6;
     private UrlShortenerService urlShortenerService;
 
     @BeforeEach
     void setUp() {
-        urlShortenerService = new UrlShortenerService();
+        ShortLinkProperties properties = new ShortLinkProperties("short.ly", 10000, DEFAULT_CODE_LENGTH);
+        urlShortenerService = new UrlShortenerService(properties);
     }
 
     @Test
     void shorten_ReturnsAlphanumericCodeOfCorrectLength() {
         String url = "https://example.com";
-        String code = urlShortenerService.shorten(url);
-
-        assertNotNull(code);
-        assertEquals(CODE_LENGTH, code.length());
-        assertTrue(code.matches("^[a-zA-Z0-9]+$"), "Code should be alphanumeric");
+        StepVerifier.create(urlShortenerService.shorten(url))
+            .assertNext(code -> {
+                assertNotNull(code);
+                assertEquals(DEFAULT_CODE_LENGTH, code.length());
+                assertTrue(code.matches("^[a-zA-Z0-9]+$"), "Code should be alphanumeric");
+            })
+            .verifyComplete();
     }
 
     @Test
     void shorten_ReturnsSameCodeForSameUrl() {
         String url = "https://example.com";
-        String code1 = urlShortenerService.shorten(url);
-        String code2 = urlShortenerService.shorten(url);
 
-        assertEquals(code1, code2, "Same URL should return the same code");
+        urlShortenerService.shorten(url)
+            .flatMap(code1 -> urlShortenerService.shorten(url)
+                .doOnNext(code2 -> assertEquals(code1, code2, "Same URL should return the same code")))
+            .as(StepVerifier::create)
+            .expectNextCount(1)
+            .verifyComplete();
     }
 
     @Test
     void shorten_ReturnsDifferentCodesForDifferentUrls() {
         String url1 = "https://example.com/1";
         String url2 = "https://example.com/2";
-        String code1 = urlShortenerService.shorten(url1);
-        String code2 = urlShortenerService.shorten(url2);
 
-        assertNotEquals(code1, code2, "Different URLs should return different codes");
+        urlShortenerService.shorten(url1)
+            .flatMap(code1 -> urlShortenerService.shorten(url2)
+                .doOnNext(code2 -> assertNotEquals(code1, code2, "Different URLs should return different codes")))
+            .as(StepVerifier::create)
+            .expectNextCount(1)
+            .verifyComplete();
     }
 
     @Test
-    void shorten_HandlesConcurrentRequestsForSameUrl() throws InterruptedException {
+    void shorten_HandlesConcurrentRequestsForSameUrl() {
         String url = "https://example.com/concurrent";
         int threadCount = 50;
-        ExecutorService executorService = Executors.newFixedThreadPool(threadCount);
-        CountDownLatch startLatch = new CountDownLatch(1);
-        CountDownLatch finishLatch = new CountDownLatch(threadCount);
-        Set<String> codes = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
-        for (int i = 0; i < threadCount; i++) {
-            executorService.submit(() -> {
-                try {
-                    startLatch.await();
-                    String code = urlShortenerService.shorten(url);
-                    codes.add(code);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                } finally {
-                    finishLatch.countDown();
-                }
-            });
-        }
-
-        startLatch.countDown();
-        finishLatch.await();
-        executorService.shutdown();
-
-        assertEquals(1, codes.size(), "All threads should receive the same code for the same URL");
+        Flux.range(0, threadCount)
+            .flatMap(i -> urlShortenerService.shorten(url))
+            .collect(Collectors.toSet())
+            .as(StepVerifier::create)
+            .assertNext(codes -> assertEquals(1, codes.size(), "All threads should receive the same code for the same URL"))
+            .verifyComplete();
     }
 
     @Test
     void getOriginalUrl_ReturnsOriginalUrlAfterShorten() {
         String url = "https://example.com";
-        String code = urlShortenerService.shorten(url);
-        String originalUrl = urlShortenerService.getOriginalUrl(code);
 
-        assertEquals(url, originalUrl, "getOriginalUrl should return the original URL after shorten");
+        urlShortenerService.shorten(url)
+            .flatMap(code -> urlShortenerService.getOriginalUrl(code))
+            .as(StepVerifier::create)
+            .expectNext(url)
+            .verifyComplete();
     }
 
     @Test
-    void shorten_PopulatesCodeToUrlCacheConcurrently() throws InterruptedException {
+    void shorten_PopulatesCodeToUrlCacheConcurrently() {
         int count = 100;
-        ExecutorService executorService = Executors.newFixedThreadPool(10);
-        CountDownLatch latch = new CountDownLatch(count);
-        ConcurrentHashMap<String, String> results = new ConcurrentHashMap<>();
 
-        for (int i = 0; i < count; i++) {
-            final int index = i;
-            executorService.submit(() -> {
-                try {
-                    String url = "https://example.com/" + index;
-                    String code = urlShortenerService.shorten(url);
-                    results.put(code, url);
-                } finally {
-                    latch.countDown();
-                }
-            });
-        }
+        Flux.range(0, count)
+            .flatMap(i -> {
+                String url = "https://example.com/" + i;
+                return urlShortenerService.shorten(url)
+                    .map(code -> new AbstractMap.SimpleEntry<>(code, url));
+            })
+            .collectList()
+            .flatMapIterable(list -> list)
+            .flatMap(entry -> urlShortenerService.getOriginalUrl(entry.getKey())
+                .doOnNext(originalUrl -> assertEquals(entry.getValue(), originalUrl, "Cache should be populated for " + entry.getValue())))
+            .as(StepVerifier::create)
+            .expectNextCount(count)
+            .verifyComplete();
+    }
 
-        latch.await();
-        executorService.shutdown();
-
-        assertEquals(count, results.size());
-        results.forEach((code, url) ->
-            assertEquals(url, urlShortenerService.getOriginalUrl(code), "Cache should be populated for " + url));
+    @Test
+    void getOriginalUrl_ReturnsEmptyForNonExistentCode() {
+        StepVerifier.create(urlShortenerService.getOriginalUrl("nonexistent"))
+            .expectNextCount(0)
+            .verifyComplete();
     }
 }

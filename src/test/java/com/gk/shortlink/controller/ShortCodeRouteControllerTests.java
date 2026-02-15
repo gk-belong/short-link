@@ -3,6 +3,7 @@ package com.gk.shortlink.controller;
 import com.gk.shortlink.service.UrlShortenerService;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import reactor.core.publisher.Mono;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -21,7 +22,7 @@ class ShortCodeRouteControllerTests {
     void redirectToOriginalUrl_RedirectsToOriginalUrl_WhenCodeExists() {
         String code = "abc123";
         String originalUrl = "https://example.com";
-        Mockito.when(urlShortenerService.getOriginalUrl(code)).thenReturn(originalUrl);
+        Mockito.when(urlShortenerService.getOriginalUrl(code)).thenReturn(Mono.just(originalUrl));
 
         webTestClient.get()
             .uri("/{code}", code)
@@ -33,7 +34,7 @@ class ShortCodeRouteControllerTests {
     @Test
     void redirectToOriginalUrl_ReturnsNotFound_WhenCodeDoesNotExist() {
         String code = "missing";
-        Mockito.when(urlShortenerService.getOriginalUrl(code)).thenReturn(null);
+        Mockito.when(urlShortenerService.getOriginalUrl(code)).thenReturn(Mono.empty());
 
         webTestClient.get()
             .uri("/{code}", code)

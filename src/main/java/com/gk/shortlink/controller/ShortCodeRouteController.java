@@ -36,14 +36,10 @@ public class ShortCodeRouteController {
     )
     public Mono<ResponseEntity<Void>> redirectToOriginalUrl(
         @Parameter(description = "The 6-character short code", example = "a1B2c3") @PathVariable String code) {
-        return Mono.fromCallable(() -> {
-            String originalUrl = urlShortenerService.getOriginalUrl(code);
-            if (originalUrl == null) {
-                throw new UrlNotFoundException("Short code not found: " + code);
-            }
-            return ResponseEntity.status(HttpStatus.FOUND)
+        return urlShortenerService.getOriginalUrl(code)
+            .switchIfEmpty(Mono.error(new UrlNotFoundException("Short code not found: " + code)))
+            .map(originalUrl -> ResponseEntity.status(HttpStatus.FOUND)
                 .location(URI.create(originalUrl))
-                .build();
-        });
+                .build());
     }
 }

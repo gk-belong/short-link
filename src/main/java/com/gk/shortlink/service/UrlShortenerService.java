@@ -1,29 +1,32 @@
 package com.gk.shortlink.service;
 
-import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.AsyncCache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.gk.shortlink.config.ShortLinkProperties;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
+
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class UrlShortenerService {
 
-    public static final int CODE_LENGTH = 6;
-    // Configuration should be managed via application properties - future change
-    private static final int MAX_CAPACITY = 10000;
-    private final Cache<String, String> urlToCodeCache;
-    private final Cache<String, String> codeToUrlCache;
+    private final AsyncCache<String, String> urlToCodeCache;
+    private final AsyncCache<String, String> codeToUrlCache;
+    private final ShortLinkProperties properties;
 
     // Using caffeine cache to set boundaries Vs concurrentHashMap
     // Note: For production applications Redis or another distributed system approach is advisable
-    public UrlShortenerService() {
+    public UrlShortenerService(ShortLinkProperties properties) {
+        this.properties = properties;
         this.urlToCodeCache = Caffeine.newBuilder()
-            .maximumSize(MAX_CAPACITY)
-            .build();
+            .maximumSize(properties.maxCapacity())
+            .buildAsync();
 
         this.codeToUrlCache = Caffeine.newBuilder()
-            .maximumSize(MAX_CAPACITY)
-            .build();
+            .maximumSize(properties.maxCapacity())
+            .buildAsync();
     }
 
     /**
@@ -33,27 +36,28 @@ public class UrlShortenerService {
      * or to retrieve short code details
      *
      * @param originalUrl URL to be shortened
-     * @return short code as String
+     * @return short code as String wrapped in Mono
      */
-    public String shorten(String originalUrl) {
-        return urlToCodeCache.get(originalUrl, k -> {
+    public Mono<String> shorten(String originalUrl) {
+        return Mono.fromFuture(() -> urlToCodeCache.get(originalUrl, (k, executor) -> {
             String code = generateCode();
-            codeToUrlCache.put(code, originalUrl);
-            return code;
-        });
+            codeToUrlCache.put(code, CompletableFuture.completedFuture(originalUrl));
+            return CompletableFuture.completedFuture(code);
+        }));
     }
 
     /**
      * Method to retrieve the associated URL for a short code
      *
      * @param code short code representing the URL
-     * @return original URL as String
+     * @return original URL as String wrapped in Mono
      */
-    public String getOriginalUrl(String code) {
-        return codeToUrlCache.getIfPresent(code);
+    public Mono<String> getOriginalUrl(String code) {
+        return Mono.justOrEmpty(codeToUrlCache.getIfPresent(code))
+            .flatMap(future -> future != null ? Mono.fromFuture(future) : Mono.empty());
     }
 
     private String generateCode() {
-        return RandomStringUtils.secureStrong().nextAlphanumeric(CODE_LENGTH);
+        return RandomStringUtils.secureStrong().nextAlphanumeric(properties.codeLength());
     }
 }

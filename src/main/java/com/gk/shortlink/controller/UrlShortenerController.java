@@ -1,5 +1,6 @@
 package com.gk.shortlink.controller;
 
+import com.gk.shortlink.config.ShortLinkProperties;
 import com.gk.shortlink.dto.ShortenRequest;
 import com.gk.shortlink.dto.ShortenResponse;
 import com.gk.shortlink.exception.UrlNotFoundException;
@@ -11,7 +12,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,11 +26,11 @@ import java.net.URI;
 public class UrlShortenerController {
 
     private final UrlShortenerService urlShortenerService;
-    private final String shortLinkHost;
+    private final ShortLinkProperties properties;
 
-    public UrlShortenerController(UrlShortenerService urlShortenerService, @Value("${shortlink.host: localhost}") String shortLinkHost) {
+    public UrlShortenerController(UrlShortenerService urlShortenerService, ShortLinkProperties properties) {
         this.urlShortenerService = urlShortenerService;
-        this.shortLinkHost = shortLinkHost;
+        this.properties = properties;
     }
 
     @PostMapping("/shorten")
@@ -42,15 +42,16 @@ public class UrlShortenerController {
             @ApiResponse(responseCode = "400", description = "Invalid URL format or blank URL")
         }
     )
-    public Mono<ResponseEntity<ShortenResponse>> shortenUrl(@Valid @RequestBody ShortenRequest shortenRequest, ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            var code = urlShortenerService.shorten(shortenRequest.url());
-            var baseUrl = getBaseUrl(exchange);
-            var shortUrl = baseUrl + "/" + code;
-
-            return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new ShortenResponse(shortenRequest.url(), shortUrl, code));
-        });
+    public Mono<ResponseEntity<ShortenResponse>> shortenUrl(@Valid @RequestBody Mono<ShortenRequest> shortenRequestMono, ServerWebExchange exchange) {
+        return shortenRequestMono.flatMap(shortenRequest ->
+            urlShortenerService.shorten(shortenRequest.url())
+                .map(code -> {
+                    var baseUrl = getBaseUrl(exchange);
+                    var shortUrl = baseUrl + "/" + code;
+                    return ResponseEntity.status(HttpStatus.CREATED)
+                        .body(new ShortenResponse(shortenRequest.url(), shortUrl, code));
+                })
+        );
     }
 
     @GetMapping("/{code}/info")
@@ -65,16 +66,13 @@ public class UrlShortenerController {
     public Mono<ResponseEntity<ShortenResponse>> getShortCodeDetails(
         @Parameter(description = "The 6-character short code", example = "a1B2c3") @PathVariable String code,
         ServerWebExchange exchange) {
-        return Mono.fromCallable(() -> {
-            var originalUrl = urlShortenerService.getOriginalUrl(code);
-            if (null == originalUrl) {
-                throw new UrlNotFoundException("Short code not found: " + code);
-            }
-            var baseUrl = getBaseUrl(exchange);
-            var shortUrl = baseUrl + "/" + code;
-
-            return ResponseEntity.ok(new ShortenResponse(originalUrl, shortUrl, code));
-        });
+        return urlShortenerService.getOriginalUrl(code)
+            .switchIfEmpty(Mono.error(new UrlNotFoundException("Short code not found: " + code)))
+            .map(originalUrl -> {
+                var baseUrl = getBaseUrl(exchange);
+                var shortUrl = baseUrl + "/" + code;
+                return ResponseEntity.ok(new ShortenResponse(originalUrl, shortUrl, code));
+            });
     }
 
     private String getBaseUrl(ServerWebExchange exchange) {
@@ -86,7 +84,7 @@ public class UrlShortenerController {
             }
         }
 
-        StringBuilder baseUrl = new StringBuilder(scheme).append("://").append(shortLinkHost);
+        StringBuilder baseUrl = new StringBuilder(scheme).append("://").append(properties.host());
 
         if (exchange != null) {
             URI uri = exchange.getRequest().getURI();

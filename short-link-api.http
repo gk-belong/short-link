@@ -13,11 +13,13 @@ Content-Type: application/json
 GET http://localhost/api/v1/urls/{{short_code}}/info
 
 ###
+#Launch in browser to test user experience
 GET http://localhost/{{short_code}}
 
 ###
 
 #When host short.ly is added to /etc/hosts use below
+#Launch in browser to test user experience
 GET http://short.ly/{{short_code}}
 
 ###

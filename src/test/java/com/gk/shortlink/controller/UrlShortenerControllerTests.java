@@ -1,10 +1,12 @@
 package com.gk.shortlink.controller;
 
+import com.gk.shortlink.config.ShortLinkProperties;
 import com.gk.shortlink.dto.ShortenRequest;
 import com.gk.shortlink.dto.ShortenResponse;
 import com.gk.shortlink.service.UrlShortenerService;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import reactor.core.publisher.Mono;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -23,10 +25,14 @@ class UrlShortenerControllerTests {
     @MockitoBean
     private UrlShortenerService urlShortenerService;
 
+    @MockitoBean
+    private ShortLinkProperties shortLinkProperties;
+
     @Test
     void shortenUrl_ReturnsCreatedResponse() {
         String code = "a1B2c3";
-        Mockito.when(urlShortenerService.shorten(ORIGINAL_URL)).thenReturn(code);
+        Mockito.when(urlShortenerService.shorten(ORIGINAL_URL)).thenReturn(Mono.just(code));
+        Mockito.when(shortLinkProperties.host()).thenReturn("short.ly");
 
         ShortenRequest request = new ShortenRequest(ORIGINAL_URL);
 
@@ -79,7 +85,8 @@ class UrlShortenerControllerTests {
     @Test
     void getShortCodeDetails_ReturnsOkResponse_WhenCodeExists() {
         String code = "a1B2c3";
-        Mockito.when(urlShortenerService.getOriginalUrl(code)).thenReturn(ORIGINAL_URL);
+        Mockito.when(urlShortenerService.getOriginalUrl(code)).thenReturn(Mono.just(ORIGINAL_URL));
+        Mockito.when(shortLinkProperties.host()).thenReturn("short.ly");
 
         webTestClient.get()
             .uri("/api/v1/urls/{code}/info", code)
@@ -96,7 +103,7 @@ class UrlShortenerControllerTests {
     @Test
     void getShortCodeDetails_ReturnsNotFound_WhenCodeDoesNotExist() {
         String code = "nonexistent";
-        Mockito.when(urlShortenerService.getOriginalUrl(code)).thenReturn(null);
+        Mockito.when(urlShortenerService.getOriginalUrl(code)).thenReturn(Mono.empty());
 
         webTestClient.get()
             .uri("/api/v1/urls/{code}/info", code)
