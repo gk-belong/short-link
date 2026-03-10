@@ -107,4 +107,21 @@ class UrlShortenerServiceTests {
             .expectNextCount(0)
             .verifyComplete();
     }
+
+    @Test
+    void shorten_CollisionsAreRareFor10000Requests() {
+        int totalRequests = 10000;
+        Flux.range(0, totalRequests)
+            .flatMap(i -> urlShortenerService.shorten("https://example.com/" + i))
+            .collect(Collectors.toSet())
+            .as(StepVerifier::create)
+            .assertNext(codes -> {
+                // For codeLength=6, the number of possible codes is 62^6 (approx 56.8 billion).
+                // The probability of collision for 10,000 requests is very small.
+                // However, given the nature of randomness, we expect near 10,000 unique codes.
+                assertEquals(totalRequests, codes.size(),
+                    String.format("Expected %d unique codes but got %d. Collision occurred!", totalRequests, codes.size()));
+            })
+            .verifyComplete();
+    }
 }
